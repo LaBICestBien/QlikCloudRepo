@@ -1,0 +1,931 @@
+///$tab Main
+Set CreateSearchIndexOnReload=1;
+SET ThousandSep=' ';
+SET DecimalSep=',';
+SET MoneyThousandSep=' ';
+SET MoneyDecimalSep=',';
+SET MoneyFormat='# ##0,00€;-# ##0,00€';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='DD/MM/YYYY';
+SET TimestampFormat='DD/MM/YYYY h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='fr-FR';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Janvier;Février;Mars;Avril;Mai;Juin;Juillet;Août;Septembre;Octobre;Novembre;Décembre';
+SET LongMonthNames='Janvier;Février;Mars;Avril;Mai;Juin;Juillet;Août;Septembre;Octobre;Novembre;Décembre';
+SET DayNames='Lun;Mar;Mer;Jeu;Ven;Sam;Dim';
+SET LongDayNames='Lundi;Mardi;Mercredi;Jeudi;Vendredi;Samedi;Dimanche';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+Section Application;
+
+
+///$tab Layer 1
+[DIM_TEMPORAL_TMP]:
+NoConcatenate
+LOAD
+    idTemporal,
+    numberDayCalendar,
+    numberWeekCalendar,
+    numberMonthCalendar,
+    numberDayOfWeekCalendar,
+    yearCalendar,
+    numberMonthCommercial,
+    yearCommercial,
+    numberQuarterCalendar,
+    isFirstWorkingDayCommercial,
+    dateCalendar,
+    mondayWeekDateCalendar,
+    commercialDate,
+    dayNameCalendar,
+    monthNameCalendar,
+    monthNameCommercial,
+    idTemporal_Commercial
+FROM [lib://QVD:DataFiles/DIM_TEMPORAL.qvd]
+(qvd)
+WHERE [dateCalendar]>= '01/10/2023' AND dateCalendar < today();
+
+
+
+DIM_TEMPORAL_L1 :
+NoConcatenate
+LOAD *,
+
+  Addmonths(dateCalendar,-3) as dateCalendarSub3Months,
+  if(dateCalendar = Today(), 1,0) as isToday,
+  IF([numberMonthCalendar]=MONTH(Today()) and Year(Today())=[yearCalendar] and [numberDayCalendar]<=Day(Today()),1,0) as isCurrentMonth,
+IF([numberMonthCalendar]=MONTH(Today())-1 and Year(Today())=[yearCalendar] and [numberDayCalendar]<=Day(Today()),1,0) as is1MonthAgo,
+IF([numberMonthCalendar]=MONTH(Today())-3 and Year(Today())=[yearCalendar] and [numberDayCalendar]<=Day(Today()),1,0) as is3MonthAgo,
+IF([numberMonthCalendar]=MONTH(Today())-6 and Year(Today())=[yearCalendar] and [numberDayCalendar]<=Day(Today()),1,0) as is6MonthAgo,
+IF([numberMonthCalendar]=MONTH(Today()) and Year(Today())-1=[yearCalendar] and [numberDayCalendar]<=Day(Today()),1,0) as is12MonthAgo,
+if (dateCalendar >= Addmonths(Today(),-3) AND dateCalendar <= Today() ,1,0) as isIn3Months,
+idTemporal as idTemporalExist
+
+RESIDENT [DIM_TEMPORAL_TMP];
+
+DROP TABLE [DIM_TEMPORAL_TMP];
+
+
+
+[BYR_FCT_BUYER_ACTIVITY_REQUESTS_TMP]:
+LOAD
+[idContactType],
+[idSite],
+[idBuyerLanguage],
+[idCommercialStatus],
+idCommercialStatusNew,
+[idBuyerGeoArea],
+[idTemporal],
+[idContactManufacturer],
+[idContactManufacturer] as [idContactManufacturerExist],
+[idContact],
+idContact as  idContactExist,
+[idEmployee],
+[idUniverse],
+[idCategory],
+[idIVPN],
+[idTeamCommercial],
+[idCommercialDepartment],
+[idContactLanguage],
+[idContactGeoArea],
+[idPageType],
+countRequesters,
+countRFQRequesters,
+countProspectRequesters,
+[countRequestsSent],
+[countRequestsProcessed],
+[countRequestFromNL],
+[countRequestQuoteFromReco],
+[countRequestsQuote],
+[countRequestsQuoteValidated],
+[countRequestsQuoteRefused],
+[countRequestsRate],
+[countRequestsQuestion],
+[countRequestsDoc],
+[countQuote],
+[countQuoteValidated],
+[countQuoteRefused],
+[countProspects],
+[countProspectsDisplayContactDetails],
+[countProspectsPriceList],
+[countProspectsWhereToBuy],
+[countClickthrough],
+[countRegisteredClickthrough],
+[countClickthroughProduct],
+[countClickthroughLogo],
+[countRFQ],
+[countRFQProcessed],
+[countRequestWithQuoteAttachment],
+[countRequestsFromDowngraded],
+countRequestsOnDowngraded,
+countRequestsDraft,
+countEnrichmentVisitor,
+[amountQuoteValidatedExclTax],
+[amountQuoteExclTax],
+_contactId
+FROM 'lib://QVD:DataFiles/BYR_FCT_BUYER_ACTIVITY_REQUESTS_*.qvd' (qvd)
+WHERE EXISTS(idTemporalExist, idTemporal);
+
+
+BYR_FCT_BUYER_ACTIVITY_REQUESTS_L1 :
+
+LOAD *,
+
+  idTemporal&'|'&
+  idSite&'|'&
+  idUniverse&'|'&
+  idCategory&'|'&
+  idBuyerLanguage&'|'&
+  idBuyerGeoArea&'|'&
+  idContactLanguage&'|'&
+  idContactGeoArea&'|'&
+  idContactType&'|'&
+  idIVPN&'|'&
+  idTeamCommercial&'|'&
+  idCommercialDepartment&'|'&
+  idCommercialStatus &'|'& idPageType as PivotKey,
+    idContactType&'|'&
+	idSite&'|'&
+	idBuyerLanguage&'|'& 
+	idCommercialStatus&'|'&
+	idBuyerGeoArea&'|'&
+	idTemporal&'|'&
+	idContactManufacturer&'|'&
+	idContact&'|'&
+	idEmployee&'|'&
+	idUniverse&'|'&
+	idCategory&'|'&
+	idIVPN&'|'&
+	idTeamCommercial&'|'&
+	idCommercialDepartment&'|'&
+	idContactLanguage&'|'&
+	idContactGeoArea
+	as PivotKeyOTD
+
+RESIDENT [BYR_FCT_BUYER_ACTIVITY_REQUESTS_TMP];
+
+
+DROP TABLE [BYR_FCT_BUYER_ACTIVITY_REQUESTS_TMP];
+
+[BYR_FCT_REQUESTS_OTD_TMP]:
+LOAD
+    idContact,
+    idContact as idContactExist,
+    idContactType,
+    idRequest,
+    idRequest as idRequestExist,
+    idRequestDowngraded,
+    idContactManufacturer,
+    idContactManufacturer as idContactManufacturerExist,
+    idVisitor,
+    idLanguageVisitor as idBuyerLanguage,
+    idTemporal,
+    idTemporalSendDate,
+    idCommercialDepartment,
+    idTeamCommercial,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idGeoArea as idContactGeoArea,
+    idUniverse,
+    idCategory,
+    idLanguage as idContactLanguage,
+    idIVPN,
+    idEmployee,
+    idEmployeeManufacturer,
+    idSite,
+    idRequestType,
+    idRequestAttributes,
+    requestSentDate,
+    requestReceiveDate,
+    requestOpenDate,
+    requestTreatmentDate,
+    countDaysforRequestTreatment,
+    countAttachedQuote,
+    quoteSentDate,
+    quoteReceiveDate,
+    quoteOpenDate,
+    quoteTreatmentDate,
+    countDaysforQuoteTreatment,
+    emailSentDate,
+    emailReceiveDate,
+    emailOpenDate,
+    emailTreatmentDate,
+    countDaysforEmailTreatment,
+    isRepliedByBuyer,
+    isRepliedByManufacturer,
+    isAccepted,
+    _siteId,
+    _contactId,
+    _labelContactType,
+    _requestId,
+    _mailType,
+    _labelRequestStatus,
+    isAskQuote,
+    _manufacturerId,
+    _visitorId,
+    isCommission,
+    isRefused,
+    isValid,
+    isPilot,
+    vStatus,
+    isRejected,
+    countMessage,
+    countRequestsWithMessage,
+    countMessageViaInterface,
+    countMessageViaEmail,
+    countEmail,
+    newSender,
+    countDepotDevis
+FROM [lib://QVD:DataFiles/BYR_FCT_REQUESTS_OTD.qvd]
+(qvd)
+WHERE EXISTS(idTemporalExist, idTemporal);
+
+
+
+
+
+BYR_FCT_REQUESTS_OTD_L1 :
+
+LOAD *,
+
+idContactType&'|'&
+idSite&'|'&
+idBuyerLanguage&'|'& 
+idCommercialStatus&'|'&
+idBuyerGeoArea&'|'&
+idTemporal&'|'&
+idContactManufacturer&'|'&
+idContact&'|'&
+idEmployee&'|'&
+idUniverse&'|'&
+idCategory&'|'&
+idIVPN&'|'&
+idTeamCommercial&'|'&
+idCommercialDepartment&'|'&
+idContactLanguage&'|'&
+idContactGeoArea
+as PivotKey
+
+RESIDENT [BYR_FCT_REQUESTS_OTD_TMP];
+
+DROP TABLE [BYR_FCT_REQUESTS_OTD_TMP];
+
+
+///$tab Dim
+[DIM_TEMPORAL]:
+NoConcatenate
+LOAD
+    idTemporal,
+    numberDayCalendar,
+    numberWeekCalendar,
+    numberMonthCalendar,
+    numberDayOfWeekCalendar,
+    yearCalendar,
+    numberMonthCommercial,
+    yearCommercial,
+    numberQuarterCalendar,
+    isFirstWorkingDayCommercial,
+    dateCalendar,
+    mondayWeekDateCalendar,
+    commercialDate,
+    dayNameCalendar,
+    monthNameCalendar,
+    monthNameCommercial,
+    dateCalendarSub3Months,
+    isToday,
+    isIn3Months,
+isCurrentMonth,
+is1MonthAgo,
+is3MonthAgo,
+is6MonthAgo,
+is12MonthAgo,
+IF([dateCalendar]>= Today()-60,1,0) as isLast2Months,
+IF([dateCalendar]>= '06/11/2023',1,0) as isAfterMepDRD,
+idTemporal_Commercial,
+idTemporal_Commercial as idTemporal_CommercialExist,
+idTemporalExist
+RESIDENT DIM_TEMPORAL_L1
+WHERE dateCalendar >= AddMonths(today(),-12) AND dateCalendar < today();
+
+DROP TABLE DIM_TEMPORAL_L1;
+
+
+
+
+
+
+[DIM_CONTACT_GEO_AREA]:
+LOAD
+    idGeoArea as idContactGeoArea,
+    countryId as countryIdContact,
+    labelGeoAreaType as labelGeoAreaTypeContact,
+    codeLabelGeoArea as codeLabelGeoAreaContact,
+    labelPhoneCode as labelPhoneCodeContact,
+    labelOfficialLanguage as labelOfficialLanguageContact,
+    labelGeoAreaEnglish as labelGeoAreaEnglishContact,
+    labelGeoAreaFrench as labelGeoAreaFrenchContact,
+    labelTimeZone AS labelTimeZoneContact
+FROM [lib://QVD:DataFiles/DIM_CONTACT_GEO_AREA.qvd]
+(qvd);
+
+
+
+
+
+
+
+
+[DIM_BUYER_GEO_AREA]:
+LOAD
+    idGeoArea as idBuyerGeoArea,
+    countryId as countryIdBuyer,
+    labelGeoAreaType as labelGeoAreaTypeBuyer,
+    codeLabelGeoArea as codeLabelGeoAreaBuyer,
+    labelPhoneCode as labelPhoneCodeBuyer,
+    labelOfficialLanguage as labelOfficialLanguageBuyer,
+    labelGeoAreaEnglish as labelGeoAreaEnglishBuyer,
+    labelGeoAreaFrench as labelGeoAreaFrenchBuyer,
+    labelTimeZone AS labelTimeZoneBuyer
+FROM [lib://QVD:DataFiles/DIM_BUYER_GEO_AREA.qvd]
+(qvd);
+
+
+DIM_CONTACT:
+LOAD
+    idContact,
+    contactId,
+    DIM_CONTACT.countConsecutiveSubscription,
+    contactLabel,
+    dateLastSubscription,
+    salesforceId,
+    salesforceType,
+    refFiche
+FROM [lib://QVD:DataFiles/DIM_CONTACT.qvd]
+(qvd)
+WHERE EXISTS(idContactExist, idContact);
+
+DIM_CONTACT_MANUFACTURER:
+LOAD
+    idContactManufacturer,
+    isOnline,
+    manufacturerId,
+    labelManufacturer,
+    remarkCommercial,
+    remarkContent,
+    remarkMarketing
+FROM [lib://QVD:DataFiles/DIM_CONTACT_MANUFACTURER.qvd]
+(qvd)
+WHERE EXISTS(idContactManufacturerExist, idContactManufacturer);
+
+
+
+
+[DIM_CONTACT_LANGUAGE]:
+LOAD
+    idLanguage as idContactLanguage,
+    isOnline as isOnlineContact,
+    codeLabelLanguage as codeLabelLanguageContact,
+    labelLanguage as labelLanguageContact,
+    labelTLD as labelTLDContact
+FROM [lib://QVD:DataFiles/DIM_CONTACT_LANGUAGE.qvd]
+(qvd);
+
+
+
+
+
+[DIM_BUYER_LANGUAGE]:
+LOAD
+    idLanguage as idBuyerLanguage,
+    isOnline as isOnlineBuyer,
+    codeLabelLanguage as codeLabelLanguageBuyer,
+    labelLanguage as labelLanguageBuyer,
+    labelTLD as labelTLDBuyer
+FROM [lib://QVD:DataFiles/DIM_BUYER_LANGUAGE.qvd]
+(qvd);
+
+
+
+
+
+[DIM_SITE]:
+LOAD
+    idSite,
+    labelSite,
+    labelSiteAccess,
+    reportLabelSite,
+    exportLabelSite
+FROM [lib://QVD:DataFiles/DIM_SITE.qvd]
+(qvd);
+
+
+
+
+
+
+
+
+[DIM_CONTACT_TYPE]:
+LOAD
+    idContactType,
+    labelContactType,
+    parentLabelContactType,
+    reportLabelContactType
+FROM [lib://QVD:DataFiles/DIM_CONTACT_TYPE.qvd]
+(qvd);
+
+[DIM_COMMERCIAL_DEPARTMENT]:
+LOAD
+    idCommercialDepartment,
+    commercialDepartment
+FROM [lib://QVD:DataFiles/DIM_COMMERCIAL_DEPARTMENT.qvd]
+(qvd);
+
+
+
+
+
+
+[DIM_TEAM_COMMERCIAL]:
+LOAD
+    idTeamCommercial,
+    commercialGroup,
+    commercialProfil,
+    commercialTeam
+FROM [lib://QVD:DataFiles/DIM_TEAM_COMMERCIAL.qvd]
+(qvd);
+
+
+
+
+
+[DIM_UNIVERSE]:
+LOAD
+    idUniverse,
+    labelUniverseFr,
+    DescriptionUniverseFr,
+    labelUniverseEn,
+    DescriptionUniverseEn
+FROM [lib://QVD:DataFiles/DIM_UNIVERSE.qvd]
+(qvd);
+
+
+
+
+[DIM_CATEGORY]:
+LOAD
+    idCategory,
+    labelCategoryFr,
+    labelCategoryEn
+FROM [lib://QVD:DataFiles/DIM_CATEGORY.qvd]
+(qvd);
+
+
+
+[DIM_IVPN]:
+LOAD
+    idIVPN,
+    labelIVPN,
+    parentlabelIVPN
+FROM [lib://QVD:DataFiles/DIM_IVPN.qvd]
+(qvd);
+
+
+[DIM_COMMERCIAL_STATUS]:
+LOAD
+    idCommercialStatus,
+    labelCommercialStatus,
+    reportLabelCommercialStatus,
+    labelTypeCommercialStatus
+FROM [lib://QVD:DataFiles/DIM_COMMERCIAL_STATUS.qvd]
+(qvd);
+
+
+DIM_REQUEST : 
+LOAD
+    idRequest,
+    sendedRequestDate,
+    requestId,
+    requestDate,
+    isAskDoc,
+    isAskQuestion,
+    isAskQuote,
+    isFromReco,
+    isAskPriceList,
+    isFromNL,
+    isBlackListedBuyer,
+    visitorId,
+    isWithQuotationAttachment,
+    isFromDowngraded,
+    isOnDowngraded,
+    isDraft,
+isEnrichmentVisitor,
+    numberRecoContactDwg,
+    numberSelectedContactDwg
+FROM [lib://QVD:DataFiles/DIM_REQUEST.qvd]
+(qvd)
+WHERE EXISTS(idRequestExist, idRequest);
+
+DIM_REQUEST_DOWNGRADED : 
+LOAD
+    idRequest as idRequestDowngraded,
+    sendedRequestDate as sendedRequestDateDowngraded,
+    requestId as requestIdDowngraded,
+    requestDate as requestDateDowngraded
+FROM [lib://QVD:DataFiles/DIM_REQUEST.qvd]
+(qvd)
+WHERE EXISTS(idRequestExist, idRequest);
+
+DIM_EMPLOYEE : 
+LOAD
+    idEmployee,
+    signatureId,
+    numInt,
+    isAnActiveUser,
+    isCallReported,
+    login,
+    phoneNumber,
+    firstName,
+    lastName,
+    fullName,
+    email,
+    commercialLogin
+FROM [lib://QVD:DataFiles/DIM_EMPLOYEE.qvd]
+(qvd);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///$tab Fact
+BYR_FCT_BUYER_ACTIVITY_REQUESTS:
+LOAD
+    idContactType,
+    idSite,
+    idBuyerLanguage,
+    COALESCE(idCommercialStatusNew,idCommercialStatus) as idCommercialStatus,
+    idCommercialStatusNew,
+    idBuyerGeoArea,
+    idTemporal,
+    idContactManufacturer,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idTeamCommercial,
+    idCommercialDepartment,
+    idContactLanguage,
+    idContactGeoArea,
+    idPageType,
+    countRequestsSent,
+    countRequestsProcessed,
+    countRequestFromNL,
+    countRequestQuoteFromReco,
+    countRequestsQuote,
+    countRequestsQuoteValidated,
+    countRequestsQuoteRefused,
+    countRequestsRate,
+    countRequestsQuestion,
+    countRequestsDoc,
+    countQuote,
+    countQuoteValidated,
+    countQuoteRefused,
+    countProspects,
+    countProspectsDisplayContactDetails,
+    countProspectsPriceList,
+    countProspectsWhereToBuy,
+    countClickthrough,
+    countRegisteredClickthrough,
+    countClickthroughProduct,
+    countClickthroughLogo,
+    countRFQ,
+    countRFQProcessed,
+    countRequestWithQuoteAttachment,
+    countRequestsFromDowngraded,
+    countRequestsOnDowngraded,
+    countRequestsDraft,
+countEnrichmentVisitor,
+    amountQuoteValidatedExclTax,
+    amountQuoteExclTax,
+    PivotKeyOTD as PivotKey
+RESIDENT BYR_FCT_BUYER_ACTIVITY_REQUESTS_L1;
+
+DROP TABLE BYR_FCT_BUYER_ACTIVITY_REQUESTS_L1;
+
+  
+BYR_FCT_REQUESTS_OTD:
+LOAD
+    idContact,
+    idContactType,
+    idRequest,
+    idRequestDowngraded,
+    idContactManufacturer,
+    idVisitor,
+    idBuyerLanguage,
+    idTemporal,
+    idTemporalSendDate,
+    idCommercialDepartment,
+    idTeamCommercial,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idContactGeoArea,
+    idUniverse,
+    idCategory,
+    idContactLanguage,
+    idIVPN,
+    idEmployee,
+    idEmployeeManufacturer,
+    idSite,
+    idRequestType,
+    idRequestAttributes,
+    requestSentDate,
+    requestReceiveDate,
+    requestOpenDate,
+    requestTreatmentDate,
+    countDaysforRequestTreatment,
+    countAttachedQuote,
+    quoteSentDate,
+    quoteReceiveDate,
+    quoteOpenDate,
+    quoteTreatmentDate,
+    countDaysforQuoteTreatment,
+    emailSentDate,
+    emailReceiveDate,
+    emailOpenDate,
+    emailTreatmentDate,
+    countDaysforEmailTreatment,
+    isRepliedByBuyer,
+    isRepliedByManufacturer,
+    isAccepted,
+    _siteId,
+    _contactId,
+    _labelContactType,
+    _requestId,
+    _mailType,
+    _labelRequestStatus,
+    isAskQuote as isAskQuoteFact,
+    _manufacturerId,
+    _visitorId,
+    isCommission,
+    isRefused,
+    isValid,
+    isPilot,
+    vStatus,
+    isRejected,
+    countMessage,
+    countRequestsWithMessage,
+    countMessageViaInterface,
+    countMessageViaEmail,
+    countEmail,
+    newSender,
+    countDepotDevis,
+    PivotKey
+RESIDENT BYR_FCT_REQUESTS_OTD_L1
+;
+
+
+
+DROP TABLE BYR_FCT_REQUESTS_OTD_L1;
+ 
+ 
+KPI_FCT_CONTACT_FOLLOWING_TMP : 
+LOAD
+    
+    idSite,
+    idCommercialDepartment,
+    idCommercialTeam,
+    idCommercialStatus,
+    idGeoArea,
+    idContactLanguage,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idContactType,
+    SUM(countCreation) AS countCreation ,
+    SUM(countCreationCommercial) AS countCreationCommercial,
+    SUM(countCreationContent) AS countCreationContent,
+    SUM(countTrial) AS countTrial,
+    SUM(countFreeTrial) AS countFreeTrial,
+    SUM(countDowngraded) AS countDowngraded,
+    SUM(countSubscribed) AS countSubscribed,
+    SUM(countOnline) AS countOnline,
+    idTemporal as idTemporal_Commercial,
+    idTechnicalStatus
+FROM [lib://QVD:DataFiles/KPI_FCT_CONTACT_FOLLOWING.qvd]
+(qvd)
+WHERE EXISTS(idTemporal_CommercialExist, idTemporal)
+GROUP BY 
+	idSite,
+    idCommercialDepartment,
+    idCommercialTeam,
+    idCommercialStatus,
+    idGeoArea,
+    idContactLanguage,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idContactType,
+    idTemporal,
+    idTechnicalStatus
+;
+Join
+LOAD idTemporal, idTemporal_Commercial
+RESIDENT DIM_TEMPORAL;
+
+
+KPI_FCT_CONTACT_FOLLOWING :
+NoConcatenate
+LOAD *,
+ 	idContactType&'|'&
+	idSite&'|'&
+	idCommercialStatus&'|'&
+	idTemporal&'|'&
+	idUniverse&'|'&
+	idCategory&'|'&
+	idIVPN&'|'&
+	idCommercialDepartment&'|'&
+	idContactLanguage&'|'&
+	idGeoArea as PivotKey
+    RESIDENT KPI_FCT_CONTACT_FOLLOWING_TMP
+    WHERE EXISTS(idTemporal_CommercialExist, idTemporal_Commercial);
+    
+  DROP TABLE KPI_FCT_CONTACT_FOLLOWING_TMP;    
+
+
+
+///$tab Pivot
+PivotTable:
+NoConcatenate
+Load Distinct
+    PivotKey,
+    idContactType&'|'&
+	idSite&'|'&
+	idCommercialStatus&'|'&
+	idTemporal&'|'&
+	idContact&'|'&
+	idEmployee&'|'&
+	idUniverse&'|'&
+	idCategory&'|'&
+	idIVPN&'|'&
+	idCommercialDepartment&'|'&
+	idContactLanguage&'|'&
+	idContactGeoArea
+	as  PivotKeyContact,
+    idContactType,
+    idSite,
+    idBuyerLanguage,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idTemporal,
+    idContactManufacturer,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idTeamCommercial,
+    idCommercialDepartment,
+    idContactLanguage,
+    idContactGeoArea
+RESIDENT BYR_FCT_BUYER_ACTIVITY_REQUESTS;
+
+Concatenate (PivotTable)
+Load Distinct
+    PivotKey,
+    idContactType&'|'&
+	idSite&'|'&
+	idCommercialStatus&'|'&
+	idTemporal&'|'&
+	idContact&'|'&
+	idEmployee&'|'&
+	idUniverse&'|'&
+	idCategory&'|'&
+	idIVPN&'|'&
+	idCommercialDepartment&'|'&
+	idContactLanguage&'|'&
+	idContactGeoArea
+	as  PivotKeyContact,
+    idContactType,
+    idSite,
+    idBuyerLanguage,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idTemporal,
+    idContactManufacturer,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idTeamCommercial,
+    idCommercialDepartment,
+    idContactLanguage,
+    idContactGeoArea
+
+RESIDENT BYR_FCT_REQUESTS_OTD;
+
+Concatenate (PivotTable)
+Load Distinct
+    PivotKey,
+    PivotKey	as  PivotKeyContact,
+    idContactType,
+    idSite,
+    idCommercialStatus,
+    idTemporal,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idCommercialDepartment,
+    idContactLanguage,
+    idGeoArea as idContactGeoArea
+
+RESIDENT KPI_FCT_CONTACT_FOLLOWING;
+
+
+Autonumber PivotKey,  PivotKeyContact;
+
+
+
+
+Drop Fields 
+
+    idContactType,
+    idSite,
+    idBuyerLanguage,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idTemporal,
+    idContactManufacturer,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idTeamCommercial,
+    idCommercialDepartment,
+    idContactLanguage,
+    idContactGeoArea
+FROM BYR_FCT_BUYER_ACTIVITY_REQUESTS;
+
+Drop Fields 
+
+    idContactType,
+    idSite,
+    idBuyerLanguage,
+    idCommercialStatus,
+    idBuyerGeoArea,
+    idTemporal,
+    idContactManufacturer,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idTeamCommercial,
+    idCommercialDepartment,
+    idContactLanguage,
+    idContactGeoArea
+FROM BYR_FCT_REQUESTS_OTD;
+
+Drop Fields 
+
+    idContactType,
+    idSite,
+    idCommercialStatus,
+    idTemporal,
+    idTemporal_Commercial,
+    idContact,
+    idEmployee,
+    idUniverse,
+    idCategory,
+    idIVPN,
+    idCommercialDepartment,
+    idContactLanguage,
+    idGeoArea
+FROM KPI_FCT_CONTACT_FOLLOWING;
+
+
+TAG FIELD [dateCalendar] WITH '$date';
+///$tab Glossaire
+$(Include=lib://layer_0_RAW_DATA - Partagé:DataFiles/Function.txt);
+
+LET paramNameApplication = DocumentTitle();
+CALL Glossaire('$(paramNameApplication)');
+///$tab Exit Script
+Exit Script;
